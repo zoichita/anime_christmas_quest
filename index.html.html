@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anime Fight - Christmas Quest Fixed</title>
+<style>
+body { background: #0f172a; color: white; font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+h1 { color: #facc15; margin-bottom: 20px; }
+.character-select, #opponent-selection { display: flex; justify-content: center; flex-wrap: wrap; gap: 20px; margin-bottom: 20px; }
+.char-card { border: 2px solid #334155; border-radius: 10px; padding: 10px; width: 140px; cursor: pointer; transition: border-color 0.3s, background-color 0.3s; background-color: #1e293b; }
+.char-card.selected { border-color: #facc15; background-color: #475569; }
+.char-graphic { width: 120px; height: 120px; margin-bottom: 10px; user-select: none; }
+button.attack-btn { padding: 12px 30px; font-size: 18px; margin: 10px 15px; border-radius: 12px; border: none; background: #facc15; color: #0f172a; cursor: pointer; font-weight: bold; transition: background-color 0.3s; }
+button.attack-btn:hover { background-color: #eab308; }
+.bar-container { width: 220px; background: #334155; border-radius: 15px; margin: 5px auto 15px; }
+.bar { height: 24px; width: 100%; border-radius: 15px; background: linear-gradient(90deg, #facc15, #22c55e); transition: width 0.3s ease-in-out; }
+#fight-log { max-width: 600px; margin: 0 auto 20px; padding: 15px; background-color: #1e293b; border-radius: 10px; min-height: 140px; text-align: left; overflow-y: auto; font-size: 14px; }
+#next-quest { font-size: 1.3em; margin-top: 25px; background: #22c55e; color: #0f172a; padding: 12px 25px; border-radius: 15px; font-weight: bold; display: none; }
+</style>
+</head>
+<body>
+
+<h1>🎌 Anime Fight - Christmas Quest!</h1>
+
+<div id="selection-screen">
+  <h2>Διάλεξε τον χαρακτήρα σου:</h2>
+  <div id="player-selection" class="character-select"></div>
+</div>
+
+<div id="opponent-selection" style="display:none;">
+  <h2>Διάλεξε τον αντίπαλο:</h2>
+  <div id="opponent-selection-list" class="character-select"></div>
+</div>
+
+<div id="fight-screen" style="display:none;">
+  <h2>Μάχη!</h2>
+  <div style="display:flex; justify-content: space-around; flex-wrap: wrap; max-width: 650px; margin: 0 auto;">
+    <div>
+      <h3>Εσύ: <span id="player-name"></span></h3>
+      <div id="player-img" class="char-graphic"></div>
+      <div class="bar-container"><div id="player-bar" class="bar"></div></div>
+      <p>HP: <span id="player-hp-text"></span></p>
+    </div>
+    <div>
+      <h3>Αντίπαλος: <span id="opponent-name"></span></h3>
+      <div id="opponent-img" class="char-graphic"></div>
+      <div class="bar-container"><div id="opponent-bar" class="bar"></div></div>
+      <p>HP: <span id="opponent-hp-text"></span></p>
+    </div>
+  </div>
+  <div id="fight-log"></div>
+  <div>
+    <button class="attack-btn" onclick="playerAttack('normal')">Normal Attack</button>
+    <button class="attack-btn" onclick="playerAttack('special')">Special Attack</button>
+    <button class="attack-btn" onclick="playerHeal()">Heal</button>
+  </div>
+</div>
+
+<div id="next-quest">
+  🏆 Quest Complete!<br />
+  Το πρώτο δώρο σου είναι στην ντουλάπα!<br />
+  Γρίφος: <br />
+  "Μέσα σ’ένα μέρος που κρύβονται ρούχα, το πρώτο σου δώρο περιμένει κρυμμένο, ψάξε προσεκτικά!"
+</div>
+
+<script>
+const characters = [
+  {name: "Naruto", hp: 100, maxHp: 100, attack: 15, specialAttack: 30, healAmount: 20, color1: "#f28c28", color2: "#fadc5f"},
+  {name: "Luffy", hp: 100, maxHp: 100, attack: 17, specialAttack: 28, healAmount: 15, color1: "#ce1e0f", color2: "#f9b78a"},
+  {name: "Eren", hp: 100, maxHp: 100, attack: 16, specialAttack: 29, healAmount: 18, color1: "#3b8686", color2: "#62a8ac"},
+  {name: "Ichigo", hp: 100, maxHp: 100, attack: 14, specialAttack: 25, healAmount: 22, color1: "#f2b5b0", color2: "#f2594c"},
+  {name: "Deku", hp: 100, maxHp: 100, attack: 15, specialAttack: 27, healAmount: 17, color1: "#46a34b", color2: "#a7e88b"},
+  {name: "Plunderer", hp: 100, maxHp: 100, attack: 16, specialAttack: 26, healAmount: 20, color1: "#322f59", color2: "#6a7fd7"}
+];
+
+let player=null, opponent=null, playerIndex=null, wins=0, maxWins=3, availableOpponents=[];
+
+const playerSelectionDiv = document.getElementById("player-selection");
+const opponentSelectionDiv = document.getElementById("opponent-selection-list");
+const selectionScreen = document.getElementById("selection-screen");
+const opponentSelectionScreen = document.getElementById("opponent-selection");
+const fightScreen = document.getElementById("fight-screen");
+const nextQuestDiv = document.getElementById("next-quest");
+const playerNameSpan = document.getElementById("player-name");
+const playerImgDiv = document.getElementById("player-img");
+const playerBar = document.getElementById("player-bar");
+const playerHpText = document.getElementById("player-hp-text");
+const opponentNameSpan = document.getElementById("opponent-name");
+const opponentImgDiv = document.getElementById("opponent-img");
+const opponentBar = document.getElementById("opponent-bar");
+const opponentHpText = document.getElementById("opponent-hp-text");
+const fightLog = document.getElementById("fight-log");
+
+// Sounds
+const soundAttack = new Audio("https://actions.google.com/sounds/v1/combat/sword_slash.ogg");
+const soundSpecial = new Audio("https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg");
+const soundHeal = new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg");
+const soundWin = new Audio("https://actions.google.com/sounds/v1/cartoon/congratulations.ogg");
+const soundLose = new Audio("https://actions.google.com/sounds/v1/cartoon/negative_beeps.ogg");
+
+function createCharacterSVG(colors){
+  const svgNS="http://www.w3.org/2000/svg";
+  const svg=document.createElementNS(svgNS,"svg"); svg.setAttribute("viewBox","0 0 120 120"); svg.setAttribute("width","120"); svg.setAttribute("height","120");
+  const rect=document.createElementNS(svgNS,"rect"); rect.setAttribute("x","10"); rect.setAttribute("y","20"); rect.setAttribute("width","100"); rect.setAttribute("height","80"); rect.setAttribute("rx","20"); rect.setAttribute("ry","20"); rect.setAttribute("fill",colors.color1); svg.appendChild(rect);
+  const face=document.createElementNS(svgNS,"circle"); face.setAttribute("cx","60"); face.setAttribute("cy","60"); face.setAttribute("r","30"); face.setAttribute("fill",colors.color2); svg.appendChild(face);
+  const eye1=document.createElementNS(svgNS,"circle"); eye1.setAttribute("cx","45"); eye1.setAttribute("cy","60"); eye1.setAttribute("r","5"); eye1.setAttribute("fill","#000"); svg.appendChild(eye1);
+  const eye2=document.createElementNS(svgNS,"circle"); eye2.setAttribute("cx","75"); eye2.setAttribute("cy","60"); eye2.setAttribute("r","5"); eye2.setAttribute("fill","#000"); svg.appendChild(eye2);
+  const mouth=document.createElementNS(svgNS,"rect"); mouth.setAttribute("x","50"); mouth.setAttribute("y","80"); mouth.setAttribute("width","20"); mouth.setAttribute("height","8"); mouth.setAttribute("rx","4"); mouth.setAttribute("fill","#333"); svg.appendChild(mouth);
+  return svg;
+}
+
+function createCharacterCards(chars, container, clickHandler, excludeIndex=null){
+  container.innerHTML="";
+  chars.forEach((char,i)=>{
+    if(i===excludeIndex) return;
+    const card=document.createElement("div"); card.classList.add("char-card");
+    card.appendChild(createCharacterSVG(char));
+    const nameDiv=document.createElement("div"); nameDiv.textContent=char.name; card.appendChild(nameDiv);
+    card.onclick=()=>clickHandler(i);
+    container.appendChild(card);
+  });
+}
+
+function selectPlayer(i){
+  playerIndex=i; player={...characters[i]}; player.hp=player.maxHp;
+  selectionScreen.style.display="none";
+  setupAvailableOpponents();
+  createOpponentButtons();
+  opponentSelectionScreen.style.display="block";
+}
+
+function setupAvailableOpponents(){
+  availableOpponents = characters.filter((_, idx)=>idx!==playerIndex);
+}
+
+function createOpponentButtons(){
+  opponentSelectionDiv.innerHTML="";
+  availableOpponents.forEach((char,i)=>{
+    const card=document.createElement("div"); card.classList.add("char-card");
+    card.appendChild(createCharacterSVG(char));
+    const nameDiv=document.createElement("div"); nameDiv.textContent=char.name; card.appendChild(nameDiv);
+    card.onclick=()=>selectOpponent(i);
+    opponentSelectionDiv.appendChild(card);
+  });
+}
+
+function selectOpponent(i){
+  opponent = {...availableOpponents[i]}; opponent.hp = opponent.maxHp;
+  fightScreen.style.display="block"; opponentSelectionScreen.style.display="none";
+  playerNameSpan.textContent = player.name; playerImgDiv.innerHTML=""; playerImgDiv.appendChild(createCharacterSVG(player));
+  opponentNameSpan.textContent = opponent.name; opponentImgDiv.innerHTML=""; opponentImgDiv.appendChild(createCharacterSVG(opponent));
+  updateBars(); fightLog.innerHTML=""; log(`🆚 Ξεκινά η μάχη μεταξύ ${player.name} και ${opponent.name}!`);
+}
+
+function log(msg){ fightLog.innerHTML += msg+"<br>"; fightLog.scrollTop = fightLog.scrollHeight; }
+function updateBars(){
+  playerBar.style.width = (player.hp/player.maxHp*100)+"%"; playerHpText.textContent = Math.max(0,player.hp)+"/"+player.maxHp;
+  opponentBar.style.width = (opponent.hp/opponent.maxHp*100)+"%"; opponentHpText.textContent = Math.max(0,opponent.hp)+"/"+opponent.maxHp;
+}
+
+function playerAttack(type){
+  if(player.hp<=0||opponent.hp<=0) return;
+  let dmg = (type==="normal") ? Math.floor(Math.random()*(player.attack-5)+5) : player.specialAttack;
+  (type==="normal") ? soundAttack.play() : soundSpecial.play();
+  opponent.hp -= dmg; if(opponent.hp<0) opponent.hp=0;
+  log(`${player.name} χρησιμοποιεί ${type==="normal"?"Normal":"Special"} Attack και κάνει ${dmg} damage!`);
+  updateBars();
+  if(opponent.hp<=0){
+    soundWin.play(); wins++;
+    log(`🏆 Νίκησες τον ${opponent.name}! Συνολικές νίκες: ${wins}/${maxWins}`);
+    // Remove opponent from availableOpponents
+    availableOpponents = availableOpponents.filter(c=>c.name!==opponent.name);
+    if(wins>=maxWins){
+      fightScreen.style.display="none"; nextQuestDiv.style.display="block"; log(`🎉 Έχεις κερδίσει ${wins} μάχες και ολοκλήρωσες το quest!`);
+      return;
+    }
+    setTimeout(()=>{
+      log(`🔄 Επίλεξε νέο αντίπαλο για μάχη #${wins+1}:`);
+      fightScreen.style.display="none"; opponentSelectionScreen.style.display="block";
+      createOpponentButtons(); fightLog.innerHTML="";
+    }, 1500);
+    return;
+  }
+  setTimeout(opponentAttack, 1000);
+}
+
+function playerHeal(){
+  if(player.hp<=0||opponent.hp<=0) return;
+  player.hp+=player.healAmount; if(player.hp>player.maxHp) player.hp=player.maxHp;
+  log(`${player.name} χρησιμοποιεί Heal και ανακτά ${player.healAmount} HP!`); updateBars(); soundHeal.play();
+  setTimeout(opponentAttack,1000);
+}
+
+function opponentAttack(){
+  if(player.hp<=0||opponent.hp<=0) return;
+  const dmg = Math.floor(Math.random()*(opponent.attack-5)+5); player.hp-=dmg; if(player.hp<0) player.hp=0;
+  log(`${opponent.name} σε χτυπάει για ${dmg} damage!`); updateBars();
+  if(player.hp<=0){ soundLose.play(); log(`❌ Ο ${opponent.name} σε νίκησε! Δοκίμασε ξανά.`); alert("Ήσουν ηττημένος. Δοκίμασε ξανά!"); resetFight();}
+}
+
+function resetFight(){ fightScreen.style.display="none"; opponentSelectionScreen.style.display="block"; fightLog.innerHTML=""; setupAvailableOpponents(); createOpponentButtons(); }
+
+window.onload = ()=>{ createCharacterCards(characters, playerSelectionDiv, selectPlayer); };
+</script>
+</body>
+</html>
